@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ITI Trading Foundry</title>
+<style>
+:root{color-scheme:dark;--black:#0c0c0e;--panel:#161619;--line:#343034;--gold:#f4c76d;--red:#ff7779;--muted:#bdb6b6}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% 0,#291517,transparent 47%),var(--black);color:#fcf5eb;font:15px system-ui,sans-serif}
+main{max-width:1150px;padding:36px 22px;margin:auto}header{border-left:4px solid var(--red);padding-left:18px;margin-bottom:26px}h1{font-size:clamp(2.1rem,6vw,4rem);margin:3px 0;letter-spacing:-.065em}h2{font-size:1.1rem;margin-top:0}.brand,.gold{color:var(--gold)}.brand{font-weight:800;letter-spacing:.16em}.red{color:var(--red)}.muted,small{color:var(--muted)}.row,.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}.pair{grid-template-columns:1.25fr 1fr}.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px;min-width:0}.metric{font-size:1.75rem;font-weight:770;font-variant-numeric:tabular-nums}button,input,select{font:inherit;background:#201e20;color:inherit;border:1px solid #50444a;border-radius:7px;padding:8px 10px}button{cursor:pointer}button.primary{background:var(--gold);color:#17120a;font-weight:750}button:disabled{opacity:.43;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold)}input[type=number]{width:82px}input[type=text]{width:100%}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{text-align:left;border-bottom:1px solid var(--line);padding:8px 4px}th{color:var(--muted);font-size:.82rem}ul{padding-left:20px}li{margin:.35rem 0}p{line-height:1.43}details{margin-top:12px}summary{cursor:pointer}.log{max-height:180px;overflow:auto}.tag{border:1px solid var(--line);border-radius:99px;padding:5px 9px}.bar{height:5px;background:#3a3032;border-radius:5px;margin-top:12px;overflow:hidden}.bar b{display:block;background:var(--gold);height:100%}@media(max-width:710px){.grid,.pair{grid-template-columns:1fr}main{padding-top:22px}}
+</style>
+<main>
+<header><div class="brand">INTERSTELLAR TECHNOLOGIES INITIATIVE</div><h1>Trading Foundry</h1><div class="row"><span class="tag gold">Paper trading</span><span class="tag">70 aggressive / 30 risk control</span><span class="muted" id="clock"></span></div></header>
+<div class="controls"><button id="demo" class="primary">Start practice replay</button><button id="step" disabled>Next candle</button><button id="live">Connect Kraken spot</button><button id="refresh" disabled>Refresh candles</button><label><input type="checkbox" id="late"> Alerts until 11 p.m. ET</label></div>
+<p id="status" role="status" class="muted">Choose fictional replay or the public Kraken spot feed. Orders are simulated in this page.</p>
+<section class="grid">
+<div class="card"><small>Paper equity</small><div class="metric" id="equity">$1,000.00</div><div id="outcome" class="muted">In progress</div></div>
+<div class="card"><small>Challenge target</small><div class="metric gold" id="target">$1,120.00</div><div class="muted">+12% from starting equity</div></div>
+<div class="card"><small>Challenge loss line</small><div class="metric red" id="floor">$970.00</div><div class="muted">−3% from starting equity</div></div>
+</section>
+<section class="grid">
+<div class="card"><h2 class="gold">Bottom scanner</h2><div id="bottom">Waiting for data</div><p id="entryDetail" class="muted"></p></div>
+<div class="card"><h2 class="red">Top scanner</h2><div id="top">Waiting for data</div><p id="exitDetail" class="muted"></p></div>
+<div class="card"><h2>Basket confirmation</h2><div id="breadth">Breadth —</div><div id="flow">Spot flow —</div><p class="muted">Breadth counts coins above their prior three closed 15-minute highs. Flow compares the last two five-minute windows of Bitcoin taker trades.</p></div>
+</section>
+<section class="grid pair">
+<div class="card"><h2>Basket and allocation</h2><table><thead><tr><th>Asset</th><th>Weight</th><th>Spot</th><th>Asset report</th></tr></thead><tbody id="basket"></tbody></table>
+<details><summary>Edit basket and weights</summary><p class="muted">Use symbol and percentage pairs. Confirm availability in your Funded tab before copying this basket into the app.</p><form id="edit"><input type="text" id="weights" aria-label="Basket weights" required><button>Apply basket</button></form></details></div>
+<div class="card"><h2>Paper execution</h2><div class="row"><label>Entry clips <select id="clips"><option>2</option><option>3</option><option selected>4</option></select></label><label>Basket cap <input id="cap" type="number" min="5" max="100" value="70">%</label></div>
+<label><input id="auto" type="checkbox" autocomplete="off"> Run paper bot</label><p id="decision" class="muted" role="status">Manual paper controls active.</p>
+<p id="position" class="muted">0 clips entered</p><div class="row"><button id="buy" class="primary" disabled>Add paper clip</button><button id="sell" disabled>Close paper basket</button><button id="reset">Reset run</button></div>
+<p class="muted">Starter controls: review at −1%, pause paper adds at −2%, and end the run at −3%. A qualified setup can expire before later clips. Simulated fills apply 0.04% each way.</p><h2>Alert log</h2><ul class="log" id="log" aria-live="polite"></ul><button id="export">Export completed runs</button></div>
+</section>
+<details class="card"><summary>Practice exercise and scanner rules</summary><h2>How the team makes a decision</h2><p>Use fictional replay and paper money for the classroom exercises.</p><ul><li><strong>K–5:</strong> Assign each student one coin. Have them report whether their coin is recovering. Count the reports together and practice saying “wait” when the class rule has not been met.</li><li><strong>Grades 6–8:</strong> Assign asset observers, a risk checker, and a coordinator. Write a rule for when the coordinator can add a clip and when the risk checker can stop it. Run the same replay twice and compare decisions.</li><li><strong>Grades 9–12:</strong> Run two-clip and four-clip versions on the same replay. Compare worst drawdown, then use the alert log to explain one decision you would change before testing a different replay.</li></ul><p>Start the fictional replay. Ask what changes when selling dries up, when the basket joins the bounce, and when price turns down again. Run the same replay with different clip counts and compare the result and worst dip. Use reset to restart the same scenario.</p><p>4h EMA and 1h direction give trend context. The 15m scanner uses RSI, Stoch RSI, stochastic and volume. Entry stages use closed 5m bars. The coordinator reads each asset’s reclaim status, Bitcoin spot flow, and basket risk. In paper bot mode it can enter one clip per fresh five-minute bar and close on a confirmed top, invalidation, or session cutoff. The alert log records the reason for each fill. Alerts appear in this tab from 5 a.m. to 10 p.m. Eastern by default. The replay uses a fictional time. Keep the tab open for live monitoring.</p><p>Public spot prices are a proxy for Funded quotes. Paper fills and loss checks happen only when this page observes prices. Settings and completed runs are stored in this browser when local storage is available.</p><p><a class="gold" href="https://support.kraken.com/articles/funded">Kraken Funded rules</a> · <a class="gold" href="https://docs.kraken.com/exchange/api-reference/spot-websocket-v2/trade">Kraken spot trades</a></p></details>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const defaults=[['BTC',35],['ETH',23],['SOL',19],['XRP',9],['ADA',8],['HYPE',6]];
+const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
+const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
+let basket=read('iti-basket-v1',defaults),runs=read('iti-runs-v1',[]);
+let mode='', bars={}, prices={}, quoteTimes={}, flow={}, phase=0, cursor=0, socket, timer, generation=0, lastKey='', liveReady=false, connectedAt=0, lastFeed=0, notes=new Set(), marketTime=0;
+const start=1000, spread=0.0004;
+const usd=(x,d=2)=>x==null?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:d}).format(x);
+const et=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const mean=x=>x.reduce((a,b)=>a+b,0)/x.length;
+const last=x=>x.at(-1);
+const high=x=>Math.max(...x.map(c=>c.h));
+const low=x=>Math.min(...x.map(c=>c.l));
+const validPrice=x=>Number.isFinite(x)&&x>0;
+const number=(x,d=0)=>Number.isFinite(x)?x.toFixed(d):'—';
+function freshAccount(){return {cash:start,hold:{},count:0,outcome:'',worst:0,breakLevel:null,lastAddBar:null,waitForReset:false,actions:[]};}
+let account=freshAccount();
+function windowOpen(t){const hour=Number(et.formatToParts(t).find(p=>p.type==='hour').value);return hour>=5&&hour<($('late').checked?23:22);}
+function addLog(message, force=false, key=message){
+ const t=marketTime||Date.now();if ((!force&&!windowOpen(t))||notes.has(key)) return;
+ notes.add(key);const item=document.createElement('li');item.textContent=et.format(t)+' ET · '+message;$('log').prepend(item);
+ if($('log').children.length>80)$('log').lastElementChild.remove();
+}
+function ema(values,n){const k=2/(n+1);return values.slice(n).reduce((m,v)=>m+(v-m)*k,mean(values.slice(0,n)));}
+function rsi(values,n=14){
+ if(values.length<=n)return [];
+ const moves=values.slice(1).map((v,i)=>v-values[i]);
+ let up=mean(moves.slice(0,n).map(v=>Math.max(0,v))),down=mean(moves.slice(0,n).map(v=>Math.max(0,-v)));
+ const value=()=>down===0?(up===0?50:100):100-100/(1+up/down);
+ const output=[value()];
+ for(const move of moves.slice(n)){up=(up*(n-1)+Math.max(0,move))/n;down=(down*(n-1)+Math.max(0,-move))/n;output.push(value());}
+ return output;
+}
+function stochastic(value,lo,hi){return hi===lo?50:100*(value-lo)/(hi-lo);}
+function metrics(){
+ const btc=bars.BTC??{},m=btc[5]??[],q=btc[15]??[],h=btc[60]??[],f=btc[240]??[];
+ if(m.length<10||q.length<35||h.length<5||f.length<200)return null;
+ const rs=rsi(q.map(x=>x.c)),recent=rs.slice(-14),rq=q.slice(-14);
+ const stoch=stochastic(last(q).c,low(rq),high(rq)),sr=stochastic(last(rs),Math.min(...recent),Math.max(...recent));
+ const volume=last(q).v/mean(q.slice(-21,-1).map(x=>x.v));
+ const reclaim=high(m.slice(-7,-2));
+ const strength=h.at(-1).c>=h.at(-3).c;
+ const trend=last(f).c>=ema(f.map(c=>c.c),200);
+ const oversold=rs.slice(-4).some(x=>x<=33)||stoch<=22||sr<=15;
+ const weak=q.slice(-7,-1).some(c=>c.c>last(q).c)&&last(rs)<rs.at(-2)&&rs.slice(-7,-1).some(x=>x>=60);
+ const pivot=m.slice(-9,-2).filter((c,i,a)=>i>0&&i<a.length-1&&c.l<a[i-1].l&&c.l<a[i+1].l).at(-1);
+ const invalidated=account.breakLevel!=null&&last(m).c<account.breakLevel;
+ const reversal=Boolean(weak&&pivot&&last(m).c<pivot.l);
+ const exit=invalidated||reversal;
+ let above=0,covered=0;const joins={};
+ for(const [symbol] of basket){
+   const b=bars[symbol]?.[15]??[];if(b.length<4)continue;
+   covered++;joins[symbol]=last(b).c>high(b.slice(-4,-1));above+=Number(joins[symbol]);
+ }
+ const btcFlow=Object.entries(flow).filter(([time])=>Number(time)>marketTime-600000&&Number(time)<=marketTime);
+ const total=entries=>entries.reduce((a,[,v])=>a+v,0);
+ const flowReady=mode==='demo'||(lastFeed>0&&marketTime-connectedAt>=600000&&marketTime-lastFeed<60000);
+ const latest=flowReady?total(btcFlow.filter(([time])=>Number(time)>marketTime-300000)):null;
+ const previous=flowReady?total(btcFlow.filter(([time])=>Number(time)<=marketTime-300000)):null;
+ return {m,q,rs,stoch,sr,volume,reclaim,strength,trend,oversold,weak,exit,invalidated,reversal,above,covered,joins,latest,previous};
+}
+let setup={low:null,level:null,breakout:null,expires:0};
+function evaluate(m){
+ const c=last(m.m);
+ if(c.t===lastKey||(mode==='live'&&marketTime-c.t>660000))return;
+ lastKey=c.t;
+ if(phase&&((setup.low!=null&&c.c<setup.low)||c.t>setup.expires)){
+   addLog('Bottom setup expired or broke.',false,'expired-'+c.t);
+   setup={low:null,level:null,breakout:null,expires:0};phase=0;return;
+ }
+ if(!phase&&m.oversold){
+  setup={low:low(m.m.slice(-5)),level:m.reclaim,breakout:null,expires:c.t+3600000};
+  phase=1;addLog('Watch · Bitcoin oversold.',false,'watch-'+c.t);
+  if(account.count===0)addLog('Paper entry · first probe available.',false,'probe-'+c.t);
+ }else if(phase===1&&c.c>setup.level){
+  phase=2;setup.breakout=c.h;addLog('Bitcoin reclaimed a recent high.',false,'reclaim-'+c.t);
+ }else if(phase===2&&c.l<=setup.level*1.0015&&c.c>=setup.level){
+  phase=3;setup.breakout=Math.max(setup.breakout,c.h);addLog('Bitcoin held the retest.',false,'retest-'+c.t);
+ }else if(phase===3&&c.c>setup.breakout){
+  phase=4;addLog('Bitcoin broke the rebound high.',false,'break-'+c.t);
+ }
+ if(m.exit)addLog('Paper exit · reversal or setup invalidation.',false,'exit-'+c.t);
+ else if(m.weak)addLog('Top watch · momentum fading.',false,'top-'+c.t);
+}
+function renderBasket(m){
+ $('basket').replaceChildren();
+ for(const [symbol,weight] of basket){
+  const tr=document.createElement('tr');
+  for(const value of [symbol,weight+'%',usd(prices[symbol],(prices[symbol]??0)<10?5:2),m?.joins[symbol]==null?'—':m.joins[symbol]?'Reclaimed':'Below reclaim']){
+   const td=document.createElement('td');td.textContent=value;tr.append(td);
+  }
+  $('basket').append(tr);
+ }
+}
+function equity(){
+ let value=account.cash;
+ for(const [symbol,qty] of Object.entries(account.hold)){
+   if(!validPrice(prices[symbol]))return null;
+   value+=qty*prices[symbol]*(1-spread);
+ }
+ return value;
+}
+function finish(result,e){
+ account.outcome=result;runs.push({mode,result,actions:account.actions,exposureCap:Number($('cap').value),equity:Number(e.toFixed(2)),worstDrawdownPercent:Number((account.worst*100).toFixed(3)),clips:Number($('clips').value),date:new Date().toISOString()});save('iti-runs-v1',runs);addLog(result,true,'outcome');
+}
+function paperDecision(m,t,e,feedOK,heldFresh,allFresh){
+ const open=account.count>0;
+ if(account.outcome)return {reason:'Run ended · '+account.outcome};
+ if(!feedOK||!(open?heldFresh:allFresh))return {reason:'Waiting for fresh quotes.'};
+ const c=m&&last(m.m);
+ const freshBar=Boolean(c&&(mode==='demo'||t-c.t<=660000));
+ if(open&&freshBar&&m.exit)return {action:'close',reason:m.invalidated?'Setup invalidation':'Confirmed top reversal'};
+ if(open&&!windowOpen(t))return {action:'close',reason:'Eastern session cutoff'};
+ if(!windowOpen(t))return {reason:'Outside the Eastern session.'};
+ if(e<=980)return {reason:'Adds paused at the 2% review threshold.'};
+ if(!m||!freshBar)return {reason:'Waiting for a fresh Bitcoin candle.'};
+ if(account.waitForReset)return {reason:'Waiting for oversold conditions to clear after the last exit.'};
+ if(!allFresh)return {reason:'Waiting for fresh quotes from the full basket.'};
+ if(account.lastAddBar===c.t)return {reason:'One clip per five-minute candle.'};
+ if(open&&m.covered!==basket.length)return {reason:'Waiting for reports from the full basket.'};
+ if(open&&m.above<Math.ceil(basket.length/2))return {reason:'Waiting for at least half the basket to reclaim.'};
+ if(open&&!(m.latest>0&&m.latest>m.previous))return {reason:'Waiting for positive and improving Bitcoin spot flow.'};
+ if(!canBuy)return {reason:'Waiting for the next qualified entry stage.'};
+ if(mode==='live'&&!windowOpen(c.t+300000))return {reason:'Waiting for a candle closed during the session.'};
+ return {action:'add',reason:open?'Entry stage '+phase+' · breadth '+m.above+'/'+basket.length+' · spot flow improving':'Oversold probe · first staged entry'};
+}
+let canBuy=false;
+function render(allowAutomation=true){
+ const t=marketTime||Date.now(),m=metrics();
+ $('clock').textContent=et.format(t)+' ET · '+(windowOpen(t)?'alert window open':'alerts quiet');
+ if(m){
+  if(account.waitForReset&&!m.oversold){
+   account.waitForReset=false;phase=0;setup={low:null,level:null,breakout:null,expires:0};
+  }
+  evaluate(m);
+  const breadthOK=m.covered===basket.length&&m.above>=Math.ceil(basket.length/2);
+  const flowOK=m.latest!=null&&m.latest>0&&m.latest>m.previous;
+  const thresholds={2:[1,3],3:[1,2,3],4:[1,2,3,4]}[Number($('clips').value)];
+  const confirmation=account.count===0||(breadthOK&&flowOK);
+  const threshold=thresholds[account.count];
+  $('bottom').textContent=phase?['','Oversold watch / probe','Recent high reclaimed','Retest held','Rebound high broken'][phase]:'Scanning for an oversold setup';
+  $('entryDetail').textContent='4h '+(m.trend?'above':'below')+' EMA 200 · 1h '+(m.strength?'firming':'easing lower')+' · RSI '+number(last(m.rs))+' · Stoch RSI '+number(m.sr)+' · Stoch '+number(m.stoch)+' · volume '+number(m.volume,2)+'×';
+  $('top').textContent=m.exit?'Paper exit trigger':m.weak?'Momentum fading':'Watching for weakness';
+  $('exitDetail').textContent=m.exit?'A recent swing low or the original setup level broke.':'Watch for a five-minute close below a recent swing low after momentum fades.';
+  $('breadth').textContent='Breadth '+m.above+' / '+basket.length+' · '+m.covered+' with data';
+  $('flow').textContent=m.latest==null?'Spot flow · warming up':'BTC spot delta '+usd(m.latest,0)+' · prior '+usd(m.previous,0);
+  canBuy=threshold!=null&&phase>=threshold&&confirmation&&!m.exit;
+ }else{
+  canBuy=false;$('bottom').textContent='Waiting for candle history';$('top').textContent='Waiting for candle history';
+  for(const id of ['entryDetail','exitDetail'])$(id).textContent='';
+  $('breadth').textContent='Breadth —';$('flow').textContent='Spot flow —';
+ }
+ const e=equity(),feedOK=mode==='demo'||(mode==='live'&&liveReady&&Date.now()-lastFeed<120000);
+ const fresh=symbol=>mode==='demo'||Date.now()-(quoteTimes[symbol]??0)<120000;
+ const heldFresh=Object.keys(account.hold).every(fresh);
+ const allFresh=basket.every(([s])=>validPrice(prices[s])&&fresh(s));
+ if(e!=null&&feedOK&&heldFresh&&!account.outcome){
+  account.worst=Math.max(account.worst,1-e/start);
+  const terminal=e<=970+1e-7?'Loss limit reached':e>=1120-1e-7?'Target reached':'';
+  if(terminal){
+   if($('auto').checked&&account.count>0)closePaper(e,'Auto exit · '+terminal);
+   finish(terminal,e);
+  }
+  else if(e<=990)addLog('Risk review · equity down at least 1%.',true,'risk-review');
+  if(e<=980&&!account.outcome)addLog('Paper adds paused · equity down at least 2%.',true,'risk-pause');
+ }
+ const open=Object.keys(account.hold).length>0;
+ $('equity').textContent=usd(e);$('outcome').textContent=account.outcome||(e<=980?'Adds paused':e<=990?'Risk review':'In progress');
+ $('position').textContent=account.count+' / '+$('clips').value+' clips entered · '+usd(account.cash)+' cash · '+number(100*account.worst,2)+'% worst dip';
+ $('buy').disabled=!(canBuy&&feedOK&&windowOpen(t)&&!account.outcome&&e>980&&allFresh);
+ $('sell').disabled=!(open&&feedOK&&heldFresh&&e!=null&&!account.outcome);
+ $('clips').disabled=open;$('cap').disabled=open;$('edit').querySelector('button').disabled=open;
+ const automated=$('auto').checked;
+ const decision=automated?paperDecision(m,t,e,feedOK,heldFresh,allFresh):null;
+ $('decision').textContent=decision?'Coordinator · '+decision.reason:'Manual paper controls active.';
+ if(allowAutomation&&decision?.action==='close'&&!$('sell').disabled){
+  closePaper(e,'Auto exit · '+decision.reason);account.waitForReset=true;render(false);return;
+ }
+ if(allowAutomation&&decision?.action==='add'&&!$('buy').disabled&&fillPaper('Auto entry · '+decision.reason)){
+  render(false);return;
+ }
+ if(!$('buy').disabled&&!automated)addLog('Paper clip '+(account.count+1)+' is available.',false,'clip-'+account.count+'-'+setup.expires);
+ renderBasket(m);
+}
+function reset(){
+ account=freshAccount();phase=0;setup={low:null,level:null,breakout:null,expires:0};lastKey='';notes=new Set();$('log').replaceChildren();
+}
+function stop(){
+ generation++;clearInterval(timer);if(socket)socket.close();socket=null;liveReady=false;connectedAt=0;lastFeed=0;bars={};prices={};quoteTimes={};flow={};marketTime=0;reset();
+}
+const scenario=[100,99.5,98.9,98.2,97.6,96.8,96.5,96.3,96.55,96.92,97.3,98,99,98.6,99.4,100.5,102,103,104.5,106,107,105,104,102,100,97,94,91,88,85];
+function demoFrame(){
+ const bases={BTC:63000,ETH:2200,SOL:118,XRP:1.35,ADA:.42,HYPE:26};
+ const baseTime=Date.UTC(2026,10,19,15);
+ marketTime=baseTime+cursor*300000;
+ const path=i=>scenario[Math.min(Math.max(i,0),scenario.length-1)];
+ for(const [symbol] of basket){
+  bars[symbol]={};
+  for(const tf of symbol==='BTC'?[5,15,60,240]:[15]){
+   bars[symbol][tf]=Array.from({length:220},(_,i)=>{
+    const offset=219-i,index=cursor-offset*tf/5;const base=bases[symbol]??10;
+    const units=index<0?100+Math.sin(index*.21)*.65:path(index);
+    const p=base*units/100;
+    return {t:marketTime-offset*tf*60000,c:p,h:p*1.001,l:p*.999,v:100+(index>=6&&index<=15?75:0)};
+   });
+  }
+  prices[symbol]=last(bars[symbol][15]).c;
+ }
+ flow={[marketTime-420000]:-15000,[marketTime-120000]:cursor>=9&&cursor<=20?45000:-30000};
+ $('status').textContent='Fictional practice replay · candle '+(cursor+1)+' / '+scenario.length;
+ $('step').disabled=cursor>=scenario.length-1;render();
+}
+function demo(){stop();mode='demo';cursor=0;$('refresh').disabled=true;demoFrame();}
+const symbolKey=s=>s==='BTC'?'XBTUSD':s+'USD';
+async function candles(symbol,interval){
+ const url='https://api.kraken.com/0/public/OHLC?pair='+symbolKey(symbol)+'&interval='+interval;
+ const response=await fetch(url,{signal:AbortSignal.timeout(12000)});
+ if(!response.ok)throw Error('HTTP '+response.status);
+ const data=await response.json();if(data.error?.length)throw Error(data.error.join(', '));
+ const rows=Object.entries(data.result).find(([key])=>key!=='last')?.[1];
+ if(!rows?.length)throw Error('No candle data');
+ return rows.slice(0,-1).map(c=>({t:Number(c[0])*1000,h:Number(c[2]),l:Number(c[3]),c:Number(c[4]),v:Number(c[6])}));
+}
+let syncing=false;
+async function sync(){
+ if(syncing)return;
+ syncing=true;$('refresh').disabled=true;const job=generation;
+ const issues=[];
+ const todo=[...new Set(['BTC',...basket.map(([s])=>s)])].flatMap(s=>(s==='BTC'?[5,15,60,240]:[15]).map(tf=>[s,tf]));
+ try{
+  for(let i=0;i<todo.length;i+=3){
+   if(job!==generation)return;
+   const group=todo.slice(i,i+3);
+   const result=await Promise.allSettled(group.map(([s,tf])=>candles(s,tf)));
+   if(job!==generation)return;
+   result.forEach((item,index)=>{
+    const [s,tf]=group[index];bars[s]??={};
+    if(item.status==='fulfilled')bars[s][tf]=item.value;else{delete bars[s][tf];issues.push(s+' '+tf+'m');}
+   });
+  }
+  marketTime=Date.now();
+  $('status').textContent=issues.length?'Candle data unavailable: '+issues.join(', ')+'. Check access and refresh.':'Kraken public spot · keep this tab open for updates.';
+  render();
+ } finally {
+  syncing=false;if(mode==='live')$('refresh').disabled=false;
+ }
+}
+function live(){
+ stop();mode='live';$('step').disabled=true;$('status').textContent='Connecting to public Kraken spot data…';const job=generation;
+ socket=new WebSocket('wss://ws.kraken.com/v2');
+ socket.onopen=()=>{connectedAt=Date.now();socket.send(JSON.stringify({method:'subscribe',params:{channel:'trade',symbol:[...new Set(['BTC',...basket.map(([s])=>s)])].map(s=>s+'/USD'),snapshot:true}}));};
+ socket.onmessage=event=>{
+  if(job!==generation)return;
+  const data=JSON.parse(event.data);
+  if(data.success===false){addLog('Market feed rejected '+(data.result?.symbol??'a symbol')+'.',true,data.error??'subscription');return;}
+  if(data.channel!=='trade')return;
+  marketTime=Date.now();lastFeed=marketTime;liveReady=true;
+  for(const trade of data.data){
+   const s=trade.symbol.split('/')[0],t=Date.parse(trade.timestamp),p=Number(trade.price);
+   if(!validPrice(p)||!Number.isFinite(t))continue;
+   if(t>=(quoteTimes[s]??0)){prices[s]=p;quoteTimes[s]=t;}
+   if(s==='BTC'&&data.type==='update'){
+    const bucket=Math.floor(t/10000)*10000;
+    flow[bucket]=(flow[bucket]??0)+(trade.side==='buy'?1:-1)*p*Number(trade.qty);
+   }
+  }
+  for(const key of Object.keys(flow))if(Number(key)<marketTime-620000)delete flow[key];
+ };
+ socket.onclose=()=>{if(job!==generation)return;liveReady=false;connectedAt=0;addLog('Spot trade feed disconnected. Reconnect to resume.',true,'disconnect');render();};
+ void sync();
+ let ticks=0;timer=setInterval(()=>{marketTime=Date.now();render();if(++ticks%60===0)void sync();},1000);
+}
+function recordAction(action,reason,amount,clip){
+ account.actions.push({time:new Date(marketTime||Date.now()).toISOString(),action,reason,amount:Number(amount.toFixed(2)),clip});
+ addLog(reason+' · '+usd(amount)+'.',true,'execution-'+account.actions.length);
+}
+function fillPaper(reason){
+ const cap=Number($('cap').value),clips=Number($('clips').value);
+ if(!Number.isFinite(cap)||cap<5||cap>100){$('cap').reportValidity();return false;}
+ const allocation=Math.min(account.cash,start*cap/100/clips);
+ if(allocation<=0)return false;
+ for(const [symbol,weight] of basket){
+  const cost=allocation*weight/100;
+  account.hold[symbol]=(account.hold[symbol]??0)+cost/(prices[symbol]*(1+spread));
+ }
+ account.cash-=allocation;
+ account.count++;
+ account.lastAddBar=lastKey;
+ account.breakLevel??=setup.low;
+ recordAction('entry',reason+' · clip '+account.count,allocation,account.count);
+ return true;
+}
+function closePaper(value,reason){
+ const proceeds=value-account.cash;
+ recordAction('exit',reason,proceeds,account.count);
+ account.cash=value;account.hold={};account.count=0;account.breakLevel=null;
+ phase=0;setup={low:null,level:null,breakout:null,expires:0};
+}
+$('buy').onclick=()=>{if(!$('buy').disabled&&fillPaper('Manual paper entry'))render(false);};
+$('sell').onclick=()=>{if(!$('sell').disabled){closePaper(equity(),'Manual paper exit');render(false);}};
+$('edit').onsubmit=e=>{
+ e.preventDefault();
+ const next=$('weights').value.trim().toUpperCase().split(/[,\s]+/).map(item=>{const [s,w]=item.split(':');return [s,Number(w)];});
+ if(next.length>12||new Set(next.map(([s])=>s)).size!==next.length||next.some(([s,w])=>!/^[A-Z0-9]{2,12}$/.test(s)||!(w>0))||Math.abs(next.reduce((sum,[,w])=>sum+w,0)-100)>1e-8){
+  $('status').textContent='Enter unique SYMBOL:WEIGHT pairs totaling 100%. Maximum 12 symbols.';return;
+ }
+ basket=next;save('iti-basket-v1',basket);if(mode==='live')live();else if(mode==='demo')demo();else render();
+};
+$('export').onclick=()=>{
+ const blob=new Blob([JSON.stringify(runs,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ITI_Trading_Foundry_Runs.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+$('demo').onclick=demo;$('live').onclick=live;$('refresh').onclick=sync;
+$('step').onclick=()=>{if(cursor<scenario.length-1){cursor++;demoFrame();}};
+$('reset').onclick=()=>{if(mode==='demo'){demo();return;}reset();render();};
+$('late').onchange=()=>render();$('clips').onchange=()=>render();$('auto').onchange=()=>render();
+$('auto').checked=false;
+$('weights').value=basket.map(([s,w])=>s+':'+w).join(', ');
+render();
+</script>
+</html>
